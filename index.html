@@ -176,6 +176,63 @@
         bottom: 4vh;
       }
     }
+
+    /* ========================================
+       9. CUSTOM BGM PLAYER
+    ======================================== */
+    #player-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: rgba(20, 30, 40, 0.6);
+      border: 1px solid rgba(160, 180, 200, 0.2);
+      border-radius: 20px;
+      backdrop-filter: blur(4px);
+      opacity: 0.4;
+      transition: opacity 0.3s;
+    }
+    #player-container:hover {
+      opacity: 1;
+    }
+
+    #play-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(180, 200, 220, 0.9);
+      font-size: 1.2rem;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      outline: none;
+    }
+
+    /* Volume Slider Customization */
+    #vol-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 80px;
+      height: 4px;
+      background: rgba(160, 180, 200, 0.3);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    #vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: rgba(180, 200, 220, 0.9);
+      border-radius: 50%;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -196,6 +253,16 @@
 
   <!-- 提示文字 -->
   <div class="hint">點擊任意處 — 感受漣漪</div>
+
+  <!-- 自定義音樂播放器 -->
+  <div id="player-container">
+    <button id="play-btn" title="播放/暫停">❚❚</button>
+    <input type="range" id="vol-slider" min="0" max="1" step="0.01" value="0.15" title="音量">
+  </div>
+  
+  <audio id="bgm" loop>
+    <source src="bgm.mp3" type="audio/mpeg">
+  </audio>
 
   <script>
     /* =====================================================================
@@ -578,6 +645,78 @@
     // ─── Initialize ─────────────────────────────────────────
     resize();
     animate();
+
+    // ─── Audio Logic ────────────────────────────────────────
+    const audio = document.getElementById('bgm');
+    const playBtn = document.getElementById('play-btn');
+    const volSlider = document.getElementById('vol-slider');
+    let isPlaying = false;
+
+    // 設定初始音量
+    audio.volume = 0.25;
+
+    function togglePlay() {
+      if (audio.paused) {
+        audio.play().then(() => {
+          isPlaying = true;
+          playBtn.textContent = '❚❚'; // 播放中顯示暫停圖示
+        }).catch(err => console.log('Audio play failed:', err));
+      } else {
+        audio.pause();
+        isPlaying = false;
+        playBtn.textContent = '▶';  // 暫停中顯示播放圖示
+      }
+    }
+
+    playBtn.addEventListener('click', togglePlay);
+
+    volSlider.addEventListener('input', (e) => {
+      audio.volume = e.target.value;
+    });
+
+    // 嘗試播放的函數
+    function tryPlayAudio() {
+      if (isPlaying) return; // 已經在播就不用試了
+      
+      const promise = audio.play();
+      if (promise !== undefined) {
+        promise.then(() => {
+          // 播放成功
+          isPlaying = true;
+          playBtn.textContent = '❚❚';
+          
+          // 移除所有補救用的監聽器
+          cleanupInteractionListeners();
+        }).catch(error => {
+          // 播放失敗 (被阻擋)，保持等待互動的狀態
+          console.log("Auto-play blocked, waiting for interaction...");
+        });
+      }
+    }
+
+    // 清除互動監聽器的函數
+    function cleanupInteractionListeners() {
+      document.removeEventListener('click', tryPlayAudio);
+      document.removeEventListener('touchstart', tryPlayAudio);
+      document.removeEventListener('keydown', tryPlayAudio);
+    }
+
+    // 1. 網頁載入後立即嘗試
+    window.addEventListener('load', () => {
+      tryPlayAudio();
+
+      // 2. 設定一個 3 秒後的定時器再試一次 (針對某些載入較慢的狀況)
+      setTimeout(() => {
+        if (!isPlaying) tryPlayAudio();
+      }, 3000);
+    });
+
+    // 3. 任何互動都嘗試觸發播放 (點擊、觸控、按鍵)
+    // 這是最保險的方式，因為瀏覽器政策通常允許「使用者互動後」播放聲音
+    document.addEventListener('click', tryPlayAudio);
+    document.addEventListener('touchstart', tryPlayAudio);
+    document.addEventListener('keydown', tryPlayAudio);
+
   </script>
 </body>
 </html>
